@@ -14,6 +14,8 @@ jobs:
   build:
     runs-on: rehosting-arc
     env:
+      USER: runner
+      LOGNAME: runner
       TMPDIR: /home/runner/_work/_temp
       XDG_CACHE_HOME: /home/runner/_work/.cache
     steps:
