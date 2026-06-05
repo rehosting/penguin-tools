@@ -25,10 +25,12 @@ jobs:
             max-jobs = 8
             cores = 8
 
-      - uses: nix-community/cache-nix-action@v5
+      - name: Configure Cachix
+        uses: cachix/cachix-action@v16
         with:
-          primary-key: ${{ runner.os }}-penguin-tools-${{ hashFiles('flake.lock') }}
-          restore-prefixes-first-match: ${{ runner.os }}-penguin-tools-
+          name: rehosting-tools
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: ${{ github.event_name == 'pull_request' }}
 
       - name: Flake Check
         run: nix flake check .
