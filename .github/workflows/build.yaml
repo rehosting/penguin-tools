@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,11 +13,31 @@ permissions:
 jobs:
   build:
     runs-on: rehosting-arc
-
+    env:
+      TMPDIR: /home/runner/_work/_temp
+      XDG_CACHE_HOME: /home/runner/_work/.cache
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Dependencies
+      - name: Prepare runner directories
+        run: |
+          set -eux
+          mkdir -p "$TMPDIR" "$XDG_CACHE_HOME"
+
+      - name: Inspect runner storage
+        run: |
+          set -eux
+          df -h / /home/runner/_work || true
+          if [ -d /home/runner/_shared ]; then
+            df -h /home/runner/_shared || true
+            ls -ld /home/runner/_shared
+          fi
+          if [ -d /nix ]; then
+            df -h /nix || true
+            ls -ld /nix
+          fi
+
+      - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y curl jq xz-utils
 
       - uses: cachix/install-nix-action@v27
@@ -24,6 +46,8 @@ jobs:
           extra_nix_config: |
             max-jobs = 8
             cores = 8
+            keep-outputs = true
+            keep-derivations = true
 
       - name: Configure Cachix
         uses: cachix/cachix-action@v16
@@ -32,18 +56,23 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           skipPush: ${{ github.event_name == 'pull_request' }}
 
-      - name: Flake Check
+      - name: Flake check
         run: nix flake check .
 
-      - name: Build Release Artifact
-        run: nix build .#dist && cp result penguin-tools.tar.gz
+      - name: Build release artifact
+        run: |
+          set -eux
+          nix build .#dist
+          cp --dereference result penguin-tools.tar.gz
 
       - uses: reecetech/version-increment@2023.10.1
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         id: version
         with:
           use_api: true
 
       - name: Create release
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         id: create_release
         uses: actions/create-release@v1
         env:
@@ -51,11 +80,12 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.v-version }}
           release_name: Release ${{ steps.version.outputs.v-version }}
-          body: Release ${{ steps.version.outputs.v-version }} @${{ github.ref }}
+          body: Release ${{ steps.version.outputs.v-version }} @${{ github.ref_name }}
           draft: true
           prerelease: false
 
       - name: Upload release asset
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -66,6 +96,7 @@ jobs:
           asset_content_type: application/gzip
 
       - name: Publish release
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: StuYarrow/publish-release@v1.1.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
