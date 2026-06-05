@@ -1,0 +1,14 @@
+diff --git a/pkgs/build-support/cc-wrapper/default.nix b/pkgs/build-support/cc-wrapper/default.nix
+index 6d9780b3913c..37846b433df2 100644
+--- a/pkgs/build-support/cc-wrapper/default.nix
++++ b/pkgs/build-support/cc-wrapper/default.nix
+@@ -883,6 +883,9 @@ stdenvNoCC.mkDerivation {
+     + optionalString (targetPlatform.libc == "musl" && targetPlatform.isx86_32) ''
+       hardening_unsupported_flags+=" stackprotector"
+     ''
++    + optionalString (targetPlatform.libc == "musl" && targetPlatform.isPower && targetPlatform.is32bit) ''
++      hardening_unsupported_flags+=" stackprotector"
++    ''
+     + optionalString targetPlatform.isNetBSD ''
+       hardening_unsupported_flags+=" stackprotector fortify"
+     ''
