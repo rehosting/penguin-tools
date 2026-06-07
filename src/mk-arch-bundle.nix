@@ -204,7 +204,11 @@ pkgs.runCommand "penguin-tools-${penguinArch}"
       fi
     }
 
-    while IFS='|' read -r tool_name tool_mode tool_kind tool_path tool_link_target; do
+    # The "|| [ -n ... ]" keeps the last record even though the manifest has no
+    # trailing newline (writeText joins lines with concatStringsSep); without it
+    # `read` would consume the final tool into the variables but exit the loop
+    # before staging it, silently dropping whichever tool sorts last.
+    while IFS='|' read -r tool_name tool_mode tool_kind tool_path tool_link_target || [ -n "$tool_name" ]; do
       [ -n "$tool_name" ] || continue
       case "$tool_mode:$tool_kind" in
         copy:binary)
