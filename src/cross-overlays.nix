@@ -48,15 +48,4 @@
       nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ super.buildPackages.pkg-config ];
     });
   })
-
-  # argp-standalone (pulled in by elfutils on musl) builds testsuite example
-  # binaries with stack-protector on. On some 32-bit musl targets (e.g.
-  # powerpc) the toolchain doesn't provide __stack_chk_fail_local, so linking
-  # the examples fails with "undefined reference to __stack_chk_fail_local".
-  # Only the static lib is consumed downstream, so just drop the hardening.
-  (self: super: {
-    argp-standalone = super.argp-standalone.overrideAttrs (o: {
-      hardeningDisable = (o.hardeningDisable or [ ]) ++ [ "stackprotector" ];
-    });
-  })
 ]
