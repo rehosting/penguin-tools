@@ -21,9 +21,15 @@
   })
 
   # GnuTLS docs builds run generated target binaries such as lt-errcodes.
+  # --disable-doc skips the doc build, so neither the "man" nor "devdoc"
+  # outputs get populated. Upstream couples these: it only passes
+  # --disable-doc for MinGW and drops both outputs in the same case. Mirror
+  # that here, or Nix fails with "failed to produce output path for output
+  # 'devdoc'" (then 'man').
   (self: super: {
     gnutls = super.gnutls.overrideAttrs (o: {
       configureFlags = (o.configureFlags or [ ]) ++ [ "--disable-doc" ];
+      outputs = builtins.filter (x: x != "man" && x != "devdoc") (o.outputs or [ "out" ]);
     });
   })
 
