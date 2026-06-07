@@ -30,6 +30,10 @@ pkgs.runCommand "cpython-runtime-${version}"
 
     cp -aL ${python}/lib/python${version} "$out/lib/"
 
+    # Files copied from the read-only /nix/store keep their 0444/0555 modes;
+    # make the tree writable so the rm/delete/sed -i fixups below can run.
+    chmod -R u+w "$out"
+
     find "$out" -type d -name __pycache__ -prune -exec rm -rf {} +
     find "$out" -type f \( -name '*.a' -o -name '*.la' -o -name '*-config' \) -delete
 
