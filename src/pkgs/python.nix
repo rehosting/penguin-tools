@@ -40,4 +40,15 @@ pkgs.runCommand "cpython-runtime-${version}"
     if grep -Irl -- ${python} "$out" >/dev/null 2>&1; then
       grep -IrlZ -- ${python} "$out" | xargs -0r sed -i "s|${python}|$out|g"
     fi
+
+    # subprocess.py and ctypes' fetch_macholib hardcode the build sysroot's
+    # shell. On the guest the shell lives at /bin/sh. (Other residual
+    # build-time /nix/store references in this tree -- sysconfigdata, the
+    # libpython PREFIX baked into rodata, etc. -- are neutralized generically
+    # by the bundle's store-path scrub.)
+    grep -IrlZ -aP '/nix/store/[a-z0-9]{32}-[^/]*/bin/sh' "$out" | xargs -0r \
+      sed -i -E 's,/nix/store/[a-z0-9]{32}-[^/]*/bin/sh,/bin/sh,g'
+
+    # pip's EXTERNALLY-MANAGED marker is meaningless on the guest.
+    rm -f "$out/lib/python${version}/EXTERNALLY-MANAGED"
   ''
