@@ -20,6 +20,16 @@
     });
   })
 
+  # openssl's test suite runs only on the "native" x86_64-musl build (cross
+  # builds skip it). Its 04-test_bio_dgram datagram-socket test fails in the
+  # sandboxed builder. We only use openssl as a transitive dependency, so skip
+  # the checks.
+  (self: super: {
+    openssl = super.openssl.overrideAttrs (_: {
+      doCheck = false;
+    });
+  })
+
   # GnuTLS docs builds run generated target binaries such as lt-errcodes.
   # --disable-doc skips the doc build, so neither the "man" nor "devdoc"
   # outputs get populated. Upstream couples these: it only passes
