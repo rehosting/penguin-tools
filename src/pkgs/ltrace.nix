@@ -4,10 +4,13 @@ let
   errorImpl = ''
     #define _GNU_SOURCE
     #include <errno.h>
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <string.h>
     #define error(status, errnum, ...) \
       do { \
         fflush(stdout); \
-        fprintf(stderr, "%s: ", program_invocation_name); \
+        fprintf(stderr, "ltrace: "); \
         fprintf(stderr, __VA_ARGS__); \
         if (errnum != 0) { \
           fprintf(stderr, ": %s", strerror(errnum)); \
@@ -38,6 +41,13 @@ pkgs.ltrace.overrideAttrs (prev: {
 
       substituteInPlace sysdeps/linux-gnu/{mips/plt.c,ppc/regs.c} \
         --replace '#include <error.h>' ${pkgs.lib.escapeShellArg errorImpl}
+
+      # The ppc backend uses the kernel's PT_R0/PT_NIP/PT_LNK ptrace offsets.
+      # glibc's <sys/ptrace.h> pulls these in transitively; musl's does not, so
+      # include the kernel <asm/ptrace.h> that actually defines them.
+      substituteInPlace sysdeps/linux-gnu/ppc/ptrace.h \
+        --replace '#include <sys/ptrace.h>' '#include <sys/ptrace.h>
+#include <asm/ptrace.h>'
     '';
 
   configureFlags = [ "--datadir=/igloo" ];
