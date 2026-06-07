@@ -55,14 +55,6 @@
     };
   };
 
-  ppc = {
-    penguinName = "powerpc";
-    compatNames = [ "powerpcle" ];
-    crossSystem = {
-      config = "powerpc-linux-musl";
-    };
-  };
-
   ppc64 = {
     penguinName = "powerpc64";
     crossSystem = {

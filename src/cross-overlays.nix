@@ -20,10 +20,26 @@
     });
   })
 
+  # openssl's test suite runs only on the "native" x86_64-musl build (cross
+  # builds skip it). Its 04-test_bio_dgram datagram-socket test fails in the
+  # sandboxed builder. We only use openssl as a transitive dependency, so skip
+  # the checks.
+  (self: super: {
+    openssl = super.openssl.overrideAttrs (_: {
+      doCheck = false;
+    });
+  })
+
   # GnuTLS docs builds run generated target binaries such as lt-errcodes.
+  # --disable-doc skips the doc build, so neither the "man" nor "devdoc"
+  # outputs get populated. Upstream couples these: it only passes
+  # --disable-doc for MinGW and drops both outputs in the same case. Mirror
+  # that here, or Nix fails with "failed to produce output path for output
+  # 'devdoc'" (then 'man').
   (self: super: {
     gnutls = super.gnutls.overrideAttrs (o: {
       configureFlags = (o.configureFlags or [ ]) ++ [ "--disable-doc" ];
+      outputs = builtins.filter (x: x != "man" && x != "devdoc") (o.outputs or [ "out" ]);
     });
   })
 

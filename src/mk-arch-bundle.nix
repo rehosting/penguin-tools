@@ -229,5 +229,15 @@ pkgs.runCommand "penguin-tools-${penguinArch}"
       ln -sfn "$arch" "$out/igloo_static/dylibs/${compatArch}"
     '') compatNames}
 
+    # Some tools bake their build-time /nix/store prefix into the binary's
+    # rodata (e.g. CPython's PREFIX in libpython, ltrace's SYSCONFDIR) or into
+    # leftover text config. These are compile-time fallbacks, overridden at
+    # runtime, and point at paths that do not exist on the guest anyway. Rewrite
+    # the store prefix everywhere so the tree carries no /nix/store references.
+    # "/igloo_nix" is exactly as long as "/nix/store", so the substitution is
+    # length-preserving and leaves ELF section offsets intact.
+    find "$out/igloo_static" -type f -print0 \
+      | xargs -0r sed -i 's|/nix/store|/igloo_nix|g'
+
     validate_tree
   ''
