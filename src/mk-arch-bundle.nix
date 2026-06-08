@@ -215,6 +215,27 @@ pkgs.runCommand "penguin-tools-${penguinArch}"
         bad=1
       fi
 
+      # Every staged ELF must be runnable on the guest from this tree alone: its
+      # interpreter and every NEEDED soname must resolve inside dylibs/<arch>.
+      # The musl loader looks up those literal names, so a missing alias means
+      # the binary silently fails to launch at runtime (not caught above).
+      local elf interp needed
+      while IFS= read -r elf; do
+        is_elf "$elf" || continue
+        interp="$(patchelf --print-interpreter "$elf" 2>/dev/null || true)"
+        if [ -n "$interp" ] && [ ! -e "$dylib_dir/$(basename "$interp")" ]; then
+          echo "Missing interpreter $(basename "$interp") for $elf" >&2
+          bad=1
+        fi
+        while IFS= read -r needed; do
+          [ -n "$needed" ] || continue
+          if [ ! -e "$dylib_dir/$needed" ]; then
+            echo "Missing NEEDED $needed for $elf" >&2
+            bad=1
+          fi
+        done < <(patchelf --print-needed "$elf" 2>/dev/null || true)
+      done < <(find "$arch_dir" "$dylib_dir" -type f)
+
       if [ "$bad" -ne 0 ]; then
         exit 1
       fi
