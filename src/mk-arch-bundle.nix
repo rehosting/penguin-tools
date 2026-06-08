@@ -113,25 +113,41 @@ pkgs.runCommand "penguin-tools-${penguinArch}"
     copy_dependency() {
       local source_path
       local source_real
+      local ref_name
+      local real_name
       local dest
 
       source_path="$1"
       source_real="$(readlink -f "$source_path")"
+      # The name the consumer references (a soname like libstdc++.so.6, or the
+      # interpreter ld-musl-<arch>.so.1) is usually a symlink to a differently
+      # named real file (libstdc++.so.6.0.34, libc.so). We copy the real file
+      # but must also expose it under the referenced name, or the musl loader --
+      # which looks up the literal NEEDED/interp string -- can't find it.
+      ref_name="$(basename "$source_path")"
+      real_name="$(basename "$source_real")"
 
-      if [ -n "''${copied_dependencies[$source_real]:-}" ]; then
-        return 0
+      dest="$dylib_dir/$real_name"
+
+      if [ -z "''${copied_dependencies[$source_real]:-}" ]; then
+        copied_dependencies[$source_real]=1
+
+        cp -L "$source_real" "$dest"
+        chmod u+w "$dest"
+
+        if is_elf "$dest"; then
+          normalize_elf "$dest" "$source_real"
+        fi
+
+        chmod 0555 "$dest" || true
       fi
-      copied_dependencies[$source_real]=1
 
-      dest="$dylib_dir/$(basename "$source_real")"
-      cp -L "$source_real" "$dest"
-      chmod u+w "$dest"
-
-      if is_elf "$dest"; then
-        normalize_elf "$dest" "$source_real"
+      # Always (re)create the reference-name alias, even when the real file was
+      # already copied for another consumer -- the same file may be reached
+      # under several names (e.g. ld-musl-<arch>.so.1 and libc.so).
+      if [ "$ref_name" != "$real_name" ]; then
+        ln -sfn "$real_name" "$dylib_dir/$ref_name"
       fi
-
-      chmod 0555 "$dest" || true
     }
 
     stage_binary() {
