@@ -16,6 +16,8 @@
 
   arm64 = {
     penguinName = "aarch64";
+    # "arm64" is the legacy dylib/arch dir name the rest of penguin still uses.
+    compatNames = [ "arm64" ];
     crossSystem = {
       config = "aarch64-linux-musl";
     };
@@ -57,6 +59,8 @@
 
   ppc64 = {
     penguinName = "powerpc64";
+    # "ppc64" is the legacy dylib/arch dir name the rest of penguin still uses.
+    compatNames = [ "ppc64" ];
     crossSystem = {
       config = "powerpc64-linux-musl";
       gcc.abi = "elfv2";
@@ -65,7 +69,8 @@
 
   ppc64el = {
     penguinName = "powerpc64le";
-    compatNames = [ "powerpc64el" ];
+    # "ppc64el" is the legacy dylib/arch dir name the rest of penguin uses.
+    compatNames = [ "powerpc64el" "ppc64el" ];
     crossSystem = {
       config = "powerpc64le-linux-musl";
     };
@@ -80,6 +85,8 @@
 
   loongarch = {
     penguinName = "loongarch64";
+    # "loongarch" is the legacy dylib/arch dir name the rest of penguin uses.
+    compatNames = [ "loongarch" ];
     crossSystem = {
       config = "loongarch64-linux-musl";
     };

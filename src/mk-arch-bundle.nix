@@ -113,25 +113,41 @@ pkgs.runCommand "penguin-tools-${penguinArch}"
     copy_dependency() {
       local source_path
       local source_real
+      local ref_name
+      local real_name
       local dest
 
       source_path="$1"
       source_real="$(readlink -f "$source_path")"
+      # The name the consumer references (a soname like libstdc++.so.6, or the
+      # interpreter ld-musl-<arch>.so.1) is usually a symlink to a differently
+      # named real file (libstdc++.so.6.0.34, libc.so). We copy the real file
+      # but must also expose it under the referenced name, or the musl loader --
+      # which looks up the literal NEEDED/interp string -- can't find it.
+      ref_name="$(basename "$source_path")"
+      real_name="$(basename "$source_real")"
 
-      if [ -n "''${copied_dependencies[$source_real]:-}" ]; then
-        return 0
+      dest="$dylib_dir/$real_name"
+
+      if [ -z "''${copied_dependencies[$source_real]:-}" ]; then
+        copied_dependencies[$source_real]=1
+
+        cp -L "$source_real" "$dest"
+        chmod u+w "$dest"
+
+        if is_elf "$dest"; then
+          normalize_elf "$dest" "$source_real"
+        fi
+
+        chmod 0555 "$dest" || true
       fi
-      copied_dependencies[$source_real]=1
 
-      dest="$dylib_dir/$(basename "$source_real")"
-      cp -L "$source_real" "$dest"
-      chmod u+w "$dest"
-
-      if is_elf "$dest"; then
-        normalize_elf "$dest" "$source_real"
+      # Always (re)create the reference-name alias, even when the real file was
+      # already copied for another consumer -- the same file may be reached
+      # under several names (e.g. ld-musl-<arch>.so.1 and libc.so).
+      if [ "$ref_name" != "$real_name" ]; then
+        ln -sfn "$real_name" "$dylib_dir/$ref_name"
       fi
-
-      chmod 0555 "$dest" || true
     }
 
     stage_binary() {
@@ -199,12 +215,37 @@ pkgs.runCommand "penguin-tools-${penguinArch}"
         bad=1
       fi
 
+      # Every staged ELF must be runnable on the guest from this tree alone: its
+      # interpreter and every NEEDED soname must resolve inside dylibs/<arch>.
+      # The musl loader looks up those literal names, so a missing alias means
+      # the binary silently fails to launch at runtime (not caught above).
+      local elf interp needed
+      while IFS= read -r elf; do
+        is_elf "$elf" || continue
+        interp="$(patchelf --print-interpreter "$elf" 2>/dev/null || true)"
+        if [ -n "$interp" ] && [ ! -e "$dylib_dir/$(basename "$interp")" ]; then
+          echo "Missing interpreter $(basename "$interp") for $elf" >&2
+          bad=1
+        fi
+        while IFS= read -r needed; do
+          [ -n "$needed" ] || continue
+          if [ ! -e "$dylib_dir/$needed" ]; then
+            echo "Missing NEEDED $needed for $elf" >&2
+            bad=1
+          fi
+        done < <(patchelf --print-needed "$elf" 2>/dev/null || true)
+      done < <(find "$arch_dir" "$dylib_dir" -type f)
+
       if [ "$bad" -ne 0 ]; then
         exit 1
       fi
     }
 
-    while IFS='|' read -r tool_name tool_mode tool_kind tool_path tool_link_target; do
+    # The "|| [ -n ... ]" keeps the last record even though the manifest has no
+    # trailing newline (writeText joins lines with concatStringsSep); without it
+    # `read` would consume the final tool into the variables but exit the loop
+    # before staging it, silently dropping whichever tool sorts last.
+    while IFS='|' read -r tool_name tool_mode tool_kind tool_path tool_link_target || [ -n "$tool_name" ]; do
       [ -n "$tool_name" ] || continue
       case "$tool_mode:$tool_kind" in
         copy:binary)
