@@ -62,9 +62,10 @@ pkgs.ltrace.overrideAttrs (prev: {
       "riscv64"
       "loongarch"
     ];
-    iglooFallbackArchs = {
-      mips64eb = "mipseb";
-      mips64el = "mipsel";
-    };
+    # No iglooFallbackArchs: ltrace has no 64-bit MIPS build, and symlinking the
+    # 32-bit mipsel/mipseb binary does not work on a mips64 guest -- it needs the
+    # 32-bit musl loader + libc, but penguin only mounts the arch's own (64-bit)
+    # /igloo/dylibs, so the fallback ltrace fails to start. Treat mips64 like
+    # riscv64/loongarch (no ltrace) instead of shipping a broken symlink.
   };
 })
