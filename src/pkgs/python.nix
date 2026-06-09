@@ -1,7 +1,7 @@
 pkgs:
 
 let
-  python = pkgs.python3Minimal;
+  python = pkgs.python3;
   version = python.pythonVersion;
 in
 pkgs.runCommand "cpython-runtime-${version}"
