@@ -1,9 +1,12 @@
-{ pkgs, archSpec, tools }:
+{ pkgs, crossPkgs, archSpec, tools }:
 
 let
   lib = pkgs.lib;
   penguinArch = archSpec.penguinName;
   compatNames = archSpec.compatNames or [ ];
+  # Cross cc wrapper, used to resolve this arch's crt startup objects so the
+  # drop-in sysroot is a self-consistent musl toolchain (crt + libc + loader).
+  crossCC = "${crossPkgs.stdenv.cc}/bin/${crossPkgs.stdenv.cc.targetPrefix}cc";
   manifest = pkgs.writeText "manifest-${penguinArch}.txt" (
     lib.concatStringsSep "\n" (
       lib.mapAttrsToList
@@ -14,7 +17,7 @@ let
 in
 pkgs.runCommand "penguin-tools-${penguinArch}"
   {
-    nativeBuildInputs = with pkgs.buildPackages; [
+    nativeBuildInputs = (with pkgs.buildPackages; [
       bash
       coreutils
       file
@@ -22,7 +25,7 @@ pkgs.runCommand "penguin-tools-${penguinArch}"
       gnugrep
       gnused
       patchelf
-    ];
+    ]) ++ [ crossPkgs.stdenv.cc ];
   }
   ''
     set -euo pipefail
@@ -269,6 +272,25 @@ pkgs.runCommand "penguin-tools-${penguinArch}"
       ln -sfn "$arch" "$out/igloo_static/${compatArch}"
       ln -sfn "$arch" "$out/igloo_static/dylibs/${compatArch}"
     '') compatNames}
+
+    # Stage a self-consistent drop-in sysroot for this arch: the crt startup
+    # objects from this arch's own musl+gcc toolchain, plus libc.so/libgcc_s.so.1
+    # symlinked into the matching dylibs dir. penguin compiles per-project
+    # init.d/*.c drop-ins against this; sourcing the crt and the libc from the
+    # same toolchain avoids the startup mismatch a foreign libc would cause.
+    sysroot_lib="$out/igloo_static/sysroots/$arch/lib"
+    mkdir -p "$sysroot_lib"
+    for obj in Scrt1.o crti.o crtn.o crtbeginS.o crtendS.o; do
+      src="$("${crossCC}" -print-file-name="$obj")"
+      if [ ! -f "$src" ]; then
+        echo "could not resolve crt object $obj for $arch (got: $src)" >&2
+        exit 1
+      fi
+      cp "$src" "$sysroot_lib/$obj"
+      chmod u+w "$sysroot_lib/$obj"
+    done
+    ln -sfn "../../../dylibs/$arch/libc.so" "$sysroot_lib/libc.so"
+    ln -sfn "../../../dylibs/$arch/libgcc_s.so.1" "$sysroot_lib/libgcc_s.so.1"
 
     # Some tools bake their build-time /nix/store prefix into the binary's
     # rodata (e.g. CPython's PREFIX in libpython, ltrace's SYSCONFDIR) or into

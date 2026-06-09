@@ -103,6 +103,7 @@
       mkArchBundle = archKey:
         import ./src/mk-arch-bundle.nix {
           inherit pkgs;
+          crossPkgs = mkCrossPkgs archKey;
           archSpec = archMatrix.${archKey};
           tools = selectedToolPackages.${archKey};
         };
