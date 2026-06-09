@@ -92,7 +92,10 @@ pkgs.runCommand "penguin-tools-${penguinArch}"
       interp="$(patchelf --print-interpreter "$source_ref" 2>/dev/null || true)"
       if [ -n "$interp" ]; then
         copy_dependency "$interp"
-        new_interp="/igloo_static/dylibs/$arch/$(basename "$interp")"
+        # These binaries run on the *guest*, where penguin mounts this arch's
+        # dylibs flat at /igloo/dylibs (see config_patchers.py). Use that path,
+        # not the container's /igloo_static/dylibs/<arch>.
+        new_interp="/igloo/dylibs/$(basename "$interp")"
         padded_interp="$(pad_interpreter "$new_interp" "$interp")"
       else
         padded_interp=""
@@ -105,7 +108,7 @@ pkgs.runCommand "penguin-tools-${penguinArch}"
         copy_dependency "$resolved"
       done < <(patchelf --print-needed "$source_ref" 2>/dev/null || true)
 
-      patchelf --set-rpath "/igloo_static/dylibs/$arch" "$dest" 2>/dev/null || true
+      patchelf --set-rpath "/igloo/dylibs" "$dest" 2>/dev/null || true
 
       if [ -n "$interp" ]; then
         # MIPS targets are flaky when patchelf rewrites the interpreter path.
@@ -256,7 +259,9 @@ pkgs.runCommand "penguin-tools-${penguinArch}"
           ;;
         copy:tree)
           stage_tree "$tool_path" "$arch_dir/$tool_name"
-          rewrite_text_refs "$tool_path" "/igloo_static/$arch/$tool_name" "$arch_dir/$tool_name"
+          # On the guest this tree is mounted at /igloo/utils/<tool> (the arch
+          # dir maps to /igloo/utils), so rewrite its internal references there.
+          rewrite_text_refs "$tool_path" "/igloo/utils/$tool_name" "$arch_dir/$tool_name"
           ;;
         symlink:binary|symlink:tree)
           ln -sfn "$tool_link_target" "$arch_dir/$tool_name"
