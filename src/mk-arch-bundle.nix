@@ -108,7 +108,18 @@ pkgs.runCommand "penguin-tools-${penguinArch}"
         copy_dependency "$resolved"
       done < <(patchelf --print-needed "$source_ref" 2>/dev/null || true)
 
-      patchelf --set-rpath "/igloo/dylibs" "$dest" 2>/dev/null || true
+      # The musl loader (libc.so, aliased as ld-musl-<arch>.so.1) is the
+      # PT_INTERP the *kernel* maps for every dynamic guest binary. It carries
+      # no rpath of its own, so `patchelf --set-rpath` has to grow .dynamic and
+      # .dynstr, which makes patchelf append a fresh PT_LOAD. Older guest
+      # kernels (e.g. Linux 4.10) mishandle that extra RW segment and never map
+      # the loader's BSS, so the very first write in __dls2 (storing the `ldso`
+      # global) faults and every dynamic binary segfaults at startup. The loader
+      # doesn't need an rpath anyway -- NEEDED libs are found via each program's
+      # own RUNPATH=/igloo/dylibs -- so leave its ELF layout untouched.
+      if [ "$(basename "$dest")" != "libc.so" ]; then
+        patchelf --set-rpath "/igloo/dylibs" "$dest" 2>/dev/null || true
+      fi
 
       if [ -n "$interp" ]; then
         # MIPS targets are flaky when patchelf rewrites the interpreter path.
