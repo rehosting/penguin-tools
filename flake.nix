@@ -23,10 +23,14 @@
       };
       lib = pkgs.lib;
 
+      # Generic cross-compilation fixes (e.g. gnutls' target-binary doc build).
+      crossOverlays = import ./src/cross-overlays.nix;
+
       mkCrossPkgs = archKey:
         import nixpkgs {
           inherit system;
           config.allowUnsupportedSystem = true;
+          overlays = crossOverlays;
           crossSystem = archMatrix.${archKey}.crossSystem;
         };
 
