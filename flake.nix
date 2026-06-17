@@ -45,10 +45,17 @@
               drv = crossPkgs.strace;
               exe = "${crossPkgs.strace}/bin/strace";
             };
-            gdbserver = {
-              drv = crossPkgs.gdbHostCpuOnly;
-              exe = "${crossPkgs.gdbHostCpuOnly}/bin/gdbserver";
-            };
+            # debuginfod is a gdb *client* feature (symbol fetching over HTTP);
+            # a guest gdbserver never uses it. Disabling it drops the heavy and
+            # cross-hostile elfutils -> libmicrohttpd -> gnutls chain (gnutls'
+            # doc build runs target binaries and fails under cross-compilation),
+            # and shrinks the shipped closure.
+            gdbserver =
+              let gdb = crossPkgs.gdbHostCpuOnly.override { enableDebuginfod = false; };
+              in {
+                drv = gdb;
+                exe = "${gdb}/bin/gdbserver";
+              };
             # iptables is a single multi-call package (xtables-*-multi) that
             # dispatches on argv[0]; one derivation provides both the nft and
             # legacy entry points, so ship both exes from the same closure.
