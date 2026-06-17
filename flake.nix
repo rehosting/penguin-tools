@@ -100,10 +100,25 @@
               exe = "${crossPkgs.iptables}/bin/iptables-legacy";
             };
           };
+          # ltrace needs a couple of cross fixes: its mips backend references a
+          # struct member (relplt_count) that doesn't exist here, and proc.h
+          # uses pid_t without including unistd.h. Also point its prototype
+          # datadir at /igloo (where penguin stages the ltrace .conf files).
+          ltraceDrv = crossPkgs.ltrace.overrideAttrs (prev: {
+            postPatch = (prev.postPatch or "") + ''
+              printf "#include <unistd.h>\n%s" "$(cat proc.h)" > proc.h
+              substituteInPlace sysdeps/linux-gnu/mips/plt.c \
+                --replace 'lte->relplt_count' '//'
+            '';
+            configureFlags = (prev.configureFlags or [ ]) ++ [ "--datadir=/igloo" ];
+            installFlags = (prev.installFlags or [ ]) ++ [ "datadir=$(out)/share" ];
+            CFLAGS = "-Wno-format-overflow";
+            doCheck = false;
+          });
           ltrace = {
             ltrace = {
-              drv = crossPkgs.ltrace;
-              exe = "${crossPkgs.ltrace}/bin/ltrace";
+              drv = ltraceDrv;
+              exe = "${ltraceDrv}/bin/ltrace";
             };
           };
         in
