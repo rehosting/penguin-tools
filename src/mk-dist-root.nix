@@ -1,9 +1,12 @@
-# Assemble the per-arch runtime closures into a dist tree:
+# Assemble the per-arch runtime closures into a dist tree, rooted under
+# igloo_static/closures/ so they stay clear of the per-arch "melting pot"
+# directories (igloo_static/<arch>/) that penguin globs wholesale into
+# /igloo/utils:
 #
-#   <penguinName>/closure.tar.gz   # pristine /nix/store closure of the tools
-#   <penguinName>/manifest.json    # { tool: "/nix/store/.../bin/tool" }
-#   <penguinName>/arch.txt
-#   <compatName> -> <penguinName>  # e.g. intel64 -> x86_64
+#   closures/<penguinName>/closure.tar.gz   # pristine /nix/store closure
+#   closures/<penguinName>/manifest.json    # { tool: "/nix/store/.../bin/tool" }
+#   closures/<penguinName>/arch.txt
+#   closures/<compatName> -> <penguinName>  # e.g. intel64 -> x86_64
 { pkgs, archMatrix, archClosures }:
 
 let
@@ -15,7 +18,7 @@ pkgs.runCommand "penguin-tools-dist-root"
   }
   ''
     set -euo pipefail
-    mkdir -p "$out/igloo_static"
+    mkdir -p "$out/igloo_static/closures"
 
     ${lib.concatStringsSep "\n" (
       lib.mapAttrsToList
@@ -26,10 +29,10 @@ pkgs.runCommand "penguin-tools-dist-root"
             compatNames = spec.compatNames or [ ];
           in
           ''
-            mkdir -p "$out/igloo_static/${penguinArch}"
-            cp -a ${closure}/. "$out/igloo_static/${penguinArch}/"
+            mkdir -p "$out/igloo_static/closures/${penguinArch}"
+            cp -a ${closure}/. "$out/igloo_static/closures/${penguinArch}/"
             ${lib.concatMapStringsSep "\n"
-              (compat: ''ln -sfn "${penguinArch}" "$out/igloo_static/${compat}"'')
+              (compat: ''ln -sfn "${penguinArch}" "$out/igloo_static/closures/${compat}"'')
               compatNames}
           '')
         archClosures
