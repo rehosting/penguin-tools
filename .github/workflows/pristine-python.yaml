@@ -1,0 +1,57 @@
+name: Pristine Python Closure
+
+# Builds a PRISTINE upstream-nixpkgs cross-compiled python3 (no penguin-tools
+# ELF rewriting / dependency grafting) and uploads its runtime closure as a
+# tarball artifact. Used to test whether the mips guest SIGSEGV is caused by
+# penguin-tools' bundle machinery vs the emulator. Triggered on exp/** branch
+# pushes and manual dispatch; does NOT touch main or publish a release.
+
+on:
+  push:
+    branches:
+      - 'exp/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pristine-python:
+    runs-on: rehosting-arc
+    env:
+      USER: runner
+      LOGNAME: runner
+      TMPDIR: /home/runner/_work/_temp
+      XDG_CACHE_HOME: /home/runner/_work/.cache
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare runner directories
+        run: mkdir -p "$TMPDIR" "$XDG_CACHE_HOME"
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra_nix_config: |
+            max-jobs = 8
+            cores = 8
+            extra-substituters = https://rehosting-tools.cachix.org
+            extra-trusted-public-keys = rehosting-tools.cachix.org-1:iNKSaFwG7MfGn6Fk7oTmIcLHqfffQ+cQIE5gWc6MlY0=
+
+      - name: Build pristine cross python3 + package runtime closure
+        run: |
+          set -eux
+          # Pin to the same nixpkgs the flake uses so we hit the rehosting-tools cache.
+          nix build "github:NixOS/nixpkgs/b6067cc0127d4db9c26c79e4de0513e58d0c40c9#pkgsCross.mipsel-linux-gnu.python3" \
+            --out-link result-py
+          readlink -f result-py | tee python_store_path.txt
+          tar -cf mipsel-python3-closure.tar $(nix-store -qR ./result-py)
+          ls -la mipsel-python3-closure.tar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mipsel-python3-closure
+          path: |
+            mipsel-python3-closure.tar
+            python_store_path.txt
+          retention-days: 7
