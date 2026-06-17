@@ -7,7 +7,11 @@
 #   closures/<penguinName>/manifest.json    # { tool: "/nix/store/.../bin/tool" }
 #   closures/<penguinName>/arch.txt
 #   closures/<compatName> -> <penguinName>  # e.g. intel64 -> x86_64
-{ pkgs, archMatrix, archClosures }:
+#
+# plus the musl drop-in sysroots/dylibs (dropinSysroots), merged in at
+#   dylibs/<penguinName>/   sysroots/<penguinName>/
+# with the same compat symlinks, for penguin's per-project init.d/*.c drop-ins.
+{ pkgs, archMatrix, archClosures, dropinSysroots }:
 
 let
   lib = pkgs.lib;
@@ -27,12 +31,22 @@ pkgs.runCommand "penguin-tools-dist-root"
             spec = archMatrix.${archKey};
             penguinArch = spec.penguinName;
             compatNames = spec.compatNames or [ ];
+            sysroot = dropinSysroots.${archKey};
           in
           ''
             mkdir -p "$out/igloo_static/closures/${penguinArch}"
             cp -a ${closure}/. "$out/igloo_static/closures/${penguinArch}/"
             ${lib.concatMapStringsSep "\n"
               (compat: ''ln -sfn "${penguinArch}" "$out/igloo_static/closures/${compat}"'')
+              compatNames}
+
+            # Drop-in sysroot + dylibs (provides igloo_static/{dylibs,sysroots}/<arch>).
+            cp -a ${sysroot}/igloo_static/. "$out/igloo_static/"
+            ${lib.concatMapStringsSep "\n"
+              (compat: ''
+                ln -sfn "${penguinArch}" "$out/igloo_static/dylibs/${compat}"
+                ln -sfn "${penguinArch}" "$out/igloo_static/sysroots/${compat}"
+              '')
               compatNames}
           '')
         archClosures

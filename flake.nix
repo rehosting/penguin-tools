@@ -30,6 +30,14 @@
           crossSystem = archMatrix.${archKey}.crossSystem;
         };
 
+      # musl cross pkgs, used only to stage the drop-in compilation sysroot.
+      mkMuslCrossPkgs = archKey:
+        import nixpkgs {
+          inherit system;
+          config.allowUnsupportedSystem = true;
+          crossSystem = archMatrix.${archKey}.muslCrossSystem;
+        };
+
       # ltrace has no working build on these targets (no 64-bit MIPS / RISC-V /
       # LoongArch backend). Everything else ships python3, strace, gdbserver.
       ltraceUnsupported = [ "mips64eb" "mips64el" "riscv64" "loongarch" ];
@@ -86,15 +94,24 @@
 
       archClosures = lib.mapAttrs (archKey: _: mkArchClosure archKey) archMatrix;
 
+      mkDropinSysroot = archKey:
+        import ./src/mk-dropin-sysroot.nix {
+          inherit pkgs;
+          archSpec = archMatrix.${archKey};
+          muslCrossPkgs = mkMuslCrossPkgs archKey;
+        };
+
+      dropinSysroots = lib.mapAttrs (archKey: _: mkDropinSysroot archKey) archMatrix;
+
       distRoot = import ./src/mk-dist-root.nix {
-        inherit pkgs archMatrix archClosures;
+        inherit pkgs archMatrix archClosures dropinSysroots;
       };
 
       dist = import ./src/mk-dist-tarball.nix {
         inherit pkgs distRoot;
       };
 
-      # Per-arch closures exposed individually for inspection / partial builds.
+      # Per-arch closures / sysroots exposed individually for partial builds.
       closurePackages = builtins.listToAttrs (
         lib.mapAttrsToList
           (archKey: closure: {
@@ -103,10 +120,19 @@
           })
           archClosures
       );
+      sysrootPackages = builtins.listToAttrs (
+        lib.mapAttrsToList
+          (archKey: sysroot: {
+            name = "sysroot-${archMatrix.${archKey}.penguinName}";
+            value = sysroot;
+          })
+          dropinSysroots
+      );
     in
     {
       packages.${system} =
         closurePackages
+        // sysrootPackages
         // {
           "dist-root" = distRoot;
           dist = dist;
