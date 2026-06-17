@@ -53,6 +53,11 @@ jobs:
           nix build "${NP}#pkgsCross.mips64el-linux-gnuabi64.python3" --out-link result-mips64el
           readlink -f result-mips64el | tee mips64el_python_store_path.txt
           tar -cf mips64el-python3-closure.tar $(nix-store -qR ./result-mips64el)
+          # mips64el MUSL (n64) -- pristine, no overlays/surgery (flake output) --
+          # settles musl-vs-rewriting as the crash trigger.
+          nix build ".#pristine-python-musl-mips64el" --out-link result-musl
+          readlink -f result-musl | tee musl_mips64el_python_store_path.txt
+          tar -cf musl-mips64el-python3-closure.tar $(nix-store -qR ./result-musl)
           ls -la *-python3-closure.tar
 
       - uses: actions/upload-artifact@v4
@@ -63,4 +68,6 @@ jobs:
             mipsel_python_store_path.txt
             mips64el-python3-closure.tar
             mips64el_python_store_path.txt
+            musl-mips64el-python3-closure.tar
+            musl_mips64el_python_store_path.txt
           retention-days: 7

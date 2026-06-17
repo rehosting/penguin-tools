@@ -138,6 +138,19 @@
           "dist-root" = distRoot;
           dist = dist;
           default = dist;
+          # EXP46: PRISTINE musl python for the mips64el (n64) target -- same
+          # cross system as our bundle, but plain upstream nixpkgs with NO penguin
+          # overlays, python-mods, or mk-arch-bundle ELF surgery. Used to settle
+          # whether the wrong-mm SIGSEGV trigger is musl itself or the rewriting.
+          "pristine-python-musl-mips64el" = (import nixpkgs {
+            inherit system;
+            config.allowUnsupportedSystem = true;
+            crossSystem = {
+              config = "mips64el-linux-musl";
+              gcc.arch = "mips64r2";
+              gcc.abi = "64";
+            };
+          }).python3;
         };
 
       checks.${system} = {
