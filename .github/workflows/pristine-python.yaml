@@ -29,6 +29,9 @@ jobs:
       - name: Prepare runner directories
         run: mkdir -p "$TMPDIR" "$XDG_CACHE_HOME"
 
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y curl jq xz-utils
+
       - uses: cachix/install-nix-action@v27
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
