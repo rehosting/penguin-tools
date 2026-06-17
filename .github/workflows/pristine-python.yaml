@@ -41,20 +41,26 @@ jobs:
             extra-substituters = https://rehosting-tools.cachix.org
             extra-trusted-public-keys = rehosting-tools.cachix.org-1:iNKSaFwG7MfGn6Fk7oTmIcLHqfffQ+cQIE5gWc6MlY0=
 
-      - name: Build pristine cross python3 + package runtime closure
+      - name: Build pristine cross python3 closures (mipsel o32 + mips64el n64)
         run: |
           set -eux
-          # Pin to the same nixpkgs the flake uses so we hit the rehosting-tools cache.
-          nix build "github:NixOS/nixpkgs/b6067cc0127d4db9c26c79e4de0513e58d0c40c9#pkgsCross.mipsel-linux-gnu.python3" \
-            --out-link result-py
-          readlink -f result-py | tee python_store_path.txt
-          tar -cf mipsel-python3-closure.tar $(nix-store -qR ./result-py)
-          ls -la mipsel-python3-closure.tar
+          NP="github:NixOS/nixpkgs/b6067cc0127d4db9c26c79e4de0513e58d0c40c9"
+          # mipsel (o32)
+          nix build "${NP}#pkgsCross.mipsel-linux-gnu.python3" --out-link result-mipsel
+          readlink -f result-mipsel | tee mipsel_python_store_path.txt
+          tar -cf mipsel-python3-closure.tar $(nix-store -qR ./result-mipsel)
+          # mips64el (n64 = gnuabi64) -- same ABI as penguin's crashing python
+          nix build "${NP}#pkgsCross.mips64el-linux-gnuabi64.python3" --out-link result-mips64el
+          readlink -f result-mips64el | tee mips64el_python_store_path.txt
+          tar -cf mips64el-python3-closure.tar $(nix-store -qR ./result-mips64el)
+          ls -la *-python3-closure.tar
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mipsel-python3-closure
+          name: pristine-python-closures
           path: |
             mipsel-python3-closure.tar
-            python_store_path.txt
+            mipsel_python_store_path.txt
+            mips64el-python3-closure.tar
+            mips64el_python_store_path.txt
           retention-days: 7
