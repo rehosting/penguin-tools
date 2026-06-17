@@ -57,14 +57,34 @@
               drv = crossPkgs.strace;
               exe = "${crossPkgs.strace}/bin/strace";
             };
-            # debuginfod is a gdb *client* feature (symbol fetching over HTTP);
-            # a guest gdbserver never uses it. Disabling it drops the heavy and
-            # cross-hostile elfutils -> libmicrohttpd -> gnutls chain (gnutls'
-            # doc build runs target binaries and fails under cross-compilation),
-            # and shrinks the shipped closure.
+            # gdb pinned to 16.3 rather than nixpkgs' 17.1: 17.1 does not
+            # cross-build across our arch set (aarch64 struct user_gcs
+            # redefinition vs modern kernel headers, ser-unix.c custom-baudrate
+            # termios fields, and gdbserver's in-process agent erroring out on
+            # armv7l). 16.3 is what Alpine/Buildroot ship and predates all of
+            # that. Plus: disable the (unused, not-everywhere-supported)
+            # in-process agent, fix the mips sgidefs include, and disable
+            # debuginfod -- a gdb *client* feature a guest gdbserver never uses,
+            # which also drops the heavy elfutils -> libmicrohttpd -> gnutls
+            # chain and shrinks the closure.
             gdbserver =
-              let gdb = crossPkgs.gdbHostCpuOnly.override { enableDebuginfod = false; };
-              in {
+              let
+                gdb = (crossPkgs.gdbHostCpuOnly.override { enableDebuginfod = false; }).overrideAttrs (prev: {
+                  version = "16.3";
+                  src = crossPkgs.fetchurl {
+                    url = "mirror://gnu/gdb/gdb-16.3.tar.xz";
+                    hash = "sha256-vPzQlVKKmHkXrPn/8/FnIYFpSSbMGNYJyZ0AQsACJMU=";
+                  };
+                  postPatch = (prev.postPatch or "") + ''
+                    substituteInPlace gdb/mips-linux-nat.c \
+                      --replace '<sgidefs.h>' '<asm/sgidefs.h>' \
+                      --replace '_ABIO32' '1'
+                  '';
+                  configureFlags = (prev.configureFlags or [ ]) ++ [ "--disable-inprocess-agent" ];
+                  meta = (prev.meta or { }) // { mainProgram = "gdbserver"; };
+                });
+              in
+              {
                 drv = gdb;
                 exe = "${gdb}/bin/gdbserver";
               };
