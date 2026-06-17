@@ -1,4 +1,10 @@
-{ pkgs, archBundles }:
+# Assemble the per-arch runtime closures into a dist tree:
+#
+#   <penguinName>/closure.tar.gz   # pristine /nix/store closure of the tools
+#   <penguinName>/manifest.json    # { tool: "/nix/store/.../bin/tool" }
+#   <penguinName>/arch.txt
+#   <compatName> -> <penguinName>  # e.g. intel64 -> x86_64
+{ pkgs, archMatrix, archClosures }:
 
 let
   lib = pkgs.lib;
@@ -9,18 +15,23 @@ pkgs.runCommand "penguin-tools-dist-root"
   }
   ''
     set -euo pipefail
-
     mkdir -p "$out/igloo_static"
 
     ${lib.concatStringsSep "\n" (
       lib.mapAttrsToList
-        (_: bundle: ''
-          cp -a ${bundle}/igloo_static/. "$out/igloo_static/"
-          # Bundle trees come from the read-only /nix/store, so cp -a preserves
-          # their 0555 dir modes. The shared dirs (igloo_static, dylibs) must be
-          # writable again before the next bundle copies its arch subdir in.
-          chmod -R u+w "$out/igloo_static"
-        '')
-        archBundles
+        (archKey: closure:
+          let
+            spec = archMatrix.${archKey};
+            penguinArch = spec.penguinName;
+            compatNames = spec.compatNames or [ ];
+          in
+          ''
+            mkdir -p "$out/igloo_static/${penguinArch}"
+            cp -a ${closure}/. "$out/igloo_static/${penguinArch}/"
+            ${lib.concatMapStringsSep "\n"
+              (compat: ''ln -sfn "${penguinArch}" "$out/igloo_static/${compat}"'')
+              compatNames}
+          '')
+        archClosures
     )}
   ''
