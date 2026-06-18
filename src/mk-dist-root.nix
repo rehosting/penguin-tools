@@ -22,7 +22,13 @@ pkgs.runCommand "penguin-tools-dist-root"
   }
   ''
     set -euo pipefail
-    mkdir -p "$out/igloo_static/closures"
+    # Pre-create the writable parent dirs. The per-arch subtrees come from the
+    # nix store at mode 0555, so we must copy *into* dirs we own rather than
+    # copy the read-only parent dir itself (otherwise the next arch can't add
+    # its subdir).
+    mkdir -p "$out/igloo_static/closures" \
+             "$out/igloo_static/dylibs" \
+             "$out/igloo_static/sysroots"
 
     ${lib.concatStringsSep "\n" (
       lib.mapAttrsToList
@@ -41,7 +47,8 @@ pkgs.runCommand "penguin-tools-dist-root"
               compatNames}
 
             # Drop-in sysroot + dylibs (provides igloo_static/{dylibs,sysroots}/<arch>).
-            cp -a ${sysroot}/igloo_static/. "$out/igloo_static/"
+            cp -a ${sysroot}/igloo_static/dylibs/${penguinArch}   "$out/igloo_static/dylibs/${penguinArch}"
+            cp -a ${sysroot}/igloo_static/sysroots/${penguinArch} "$out/igloo_static/sysroots/${penguinArch}"
             ${lib.concatMapStringsSep "\n"
               (compat: ''
                 ln -sfn "${penguinArch}" "$out/igloo_static/dylibs/${compat}"
@@ -51,4 +58,8 @@ pkgs.runCommand "penguin-tools-dist-root"
           '')
         archClosures
     )}
+
+    # Some sources are read-only nix-store paths; make the assembled tree
+    # writable so downstream packaging (and local edits) don't trip on 0555.
+    chmod -R u+w "$out/igloo_static"
   ''
