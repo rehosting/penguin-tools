@@ -17,5 +17,15 @@
       configureFlags = (o.configureFlags or [ ]) ++ [ "--disable-doc" ];
       outputs = builtins.filter (x: x != "man" && x != "devdoc") (o.outputs or [ "out" ]);
     });
+
+    # gobject-introspection is pulled in (natively) as a build tool of graphviz,
+    # a doc-generation nativeBuildInput of libnl, which iptables depends on. Its
+    # meson test suite fails two cases on the build host
+    # (warn-callback-invalid-scope / -destroy). g-i is only a build tool here, so
+    # skip its checkPhase. Overlays apply to buildPackages, so this reaches the
+    # native derivation.
+    gobject-introspection = super.gobject-introspection.overrideAttrs (_: {
+      doCheck = false;
+    });
   })
 ]
