@@ -39,6 +39,14 @@
           kind = "binary";
           build = crossPkgs: import ./src/pkgs/ltrace.nix crossPkgs;
         };
+        iptables = {
+          kind = "binary";
+          build = crossPkgs: import ./src/pkgs/iptables.nix crossPkgs;
+        };
+        iptables-legacy = {
+          kind = "binary";
+          build = crossPkgs: import ./src/pkgs/iptables-legacy.nix crossPkgs;
+        };
         python = {
           kind = "tree";
           build = crossPkgs: import ./src/pkgs/python.nix crossPkgs;
