@@ -1,61 +1,31 @@
+# Generic cross-compilation fixes applied to the glibc cross package sets.
+#
+# These are NOT musl build hacks (the musl-only overrides are gone) -- they are
+# upstream cross-compilation breakages that bite any cross target:
+#
+# gnutls' doc build runs generated *target* binaries during the build
+# (./errcodes -> lt-errcodes), which fails under cross-compilation with
+# "Exec format error". gnutls is pulled in transitively by elfutils ->
+# libmicrohttpd (debuginfod) through strace, ltrace and gdb. --disable-doc
+# skips the offending step, but then the declared "man"/"devdoc" outputs are
+# never populated and Nix fails "failed to produce output path for output
+# 'devdoc'". Upstream couples these (it only passes --disable-doc for MinGW and
+# drops both outputs in the same case), so mirror that here.
 [
-  # Disable libfuse's /etc/mtab handling with util-linux's mount command.
-  (self: super: {
-    fuse3 = super.fuse3.overrideAttrs (o: {
-      # The disable-mtab option is ignored upstream, so disable mtab manually.
-      mesonFlags = (o.mesonFlags or [ ]) ++ [ "-Ddisable-mtab=true" ];
-      CFLAGS = "-DIGNORE_MTAB=1";
-    });
-  })
-
-  # Remove the unneeded util-linux dependency to speed up builds.
-  (self: super: {
-    fuse3 = super.fuse3.override { util-linux = super.emptyDirectory; };
-  })
-
-  # The p11-kit tests fail in our single-user Nix setup.
-  (self: super: {
-    p11-kit = super.p11-kit.overrideAttrs (_: {
-      doCheck = false;
-    });
-  })
-
-  # openssl's test suite runs only on the "native" x86_64-musl build (cross
-  # builds skip it). Its 04-test_bio_dgram datagram-socket test fails in the
-  # sandboxed builder. We only use openssl as a transitive dependency, so skip
-  # the checks.
-  (self: super: {
-    openssl = super.openssl.overrideAttrs (_: {
-      doCheck = false;
-    });
-  })
-
-  # GnuTLS docs builds run generated target binaries such as lt-errcodes.
-  # --disable-doc skips the doc build, so neither the "man" nor "devdoc"
-  # outputs get populated. Upstream couples these: it only passes
-  # --disable-doc for MinGW and drops both outputs in the same case. Mirror
-  # that here, or Nix fails with "failed to produce output path for output
-  # 'devdoc'" (then 'man').
   (self: super: {
     gnutls = super.gnutls.overrideAttrs (o: {
       configureFlags = (o.configureFlags or [ ]) ++ [ "--disable-doc" ];
       outputs = builtins.filter (x: x != "man" && x != "devdoc") (o.outputs or [ "out" ]);
     });
-  })
 
-  # Fix musl+loongarch+gdb builds.
-  (self: super: {
-    musl = super.musl.overrideAttrs (o: {
-      patches = (o.patches or [ ]) ++ [ ./patches/musl-loongarch-regset.patch ];
-    });
-  })
-
-  # Disable unused and broken-on-some-platforms elfutils features.
-  (self: super: {
-    elfutils = (super.elfutils.override {
-      enableDebuginfod = false;
-    }).overrideAttrs (old: {
-      nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ super.buildPackages.pkg-config ];
+    # gobject-introspection is pulled in (natively) as a build tool of graphviz,
+    # a doc-generation nativeBuildInput of libnl, which iptables depends on. Its
+    # meson test suite fails two cases on the build host
+    # (warn-callback-invalid-scope / -destroy). g-i is only a build tool here, so
+    # skip its checkPhase. Overlays apply to buildPackages, so this reaches the
+    # native derivation.
+    gobject-introspection = super.gobject-introspection.overrideAttrs (_: {
+      doCheck = false;
     });
   })
 ]
