@@ -1,5 +1,90 @@
 {
   "nodes": {
+    "busybox": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1778970754,
+        "narHash": "sha256-K0EK8t3oUt4cfVJldVTcjDWesdXaQgWtZ2I/OOA//8k=",
+        "owner": "rehosting",
+        "repo": "busybox",
+        "rev": "28a8debc2b974880c814a8cd6db28d14ff7c772b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rehosting",
+        "repo": "busybox",
+        "rev": "28a8debc2b974880c814a8cd6db28d14ff7c772b",
+        "type": "github"
+      }
+    },
+    "console": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1743183921,
+        "narHash": "sha256-mSfhbl09DcMXTYjOcAmg0bzgrscYJqiy+dL62fPREMg=",
+        "owner": "rehosting",
+        "repo": "console",
+        "rev": "c744652da5dcd256268257035d9115e7cfdaa2a4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rehosting",
+        "repo": "console",
+        "rev": "c744652da5dcd256268257035d9115e7cfdaa2a4",
+        "type": "github"
+      }
+    },
+    "guesthopper": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1779766171,
+        "narHash": "sha256-MY78opCXOrTqITttF5GToWki6I+bm9A+uPCwzVuNncs=",
+        "owner": "rehosting",
+        "repo": "guesthopper",
+        "rev": "7849568415549330c8d714f118105548cb626728",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rehosting",
+        "repo": "guesthopper",
+        "rev": "7849568415549330c8d714f118105548cb626728",
+        "type": "github"
+      }
+    },
+    "libhc": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1746116303,
+        "narHash": "sha256-hmqYiqk30CJWRJXcl9AJRJsn8VKeWtMytyaPEbY+gew=",
+        "owner": "panda-re",
+        "repo": "libhc",
+        "rev": "b2f2efbd948faca9e242ae410e035c0065ec433a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "panda-re",
+        "repo": "libhc",
+        "rev": "b2f2efbd948faca9e242ae410e035c0065ec433a",
+        "type": "github"
+      }
+    },
+    "libnvram": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1780521704,
+        "narHash": "sha256-dXLQvAfFrDLCMbKQ1tLaie4qkRRMxEN/Cd3PcsEygs8=",
+        "owner": "rehosting",
+        "repo": "libnvram",
+        "rev": "e013c0686facbb62df09b30d0d5b92dd75fd4d58",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rehosting",
+        "repo": "libnvram",
+        "rev": "e013c0686facbb62df09b30d0d5b92dd75fd4d58",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1773201692,
@@ -18,7 +103,30 @@
     },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs"
+        "busybox": "busybox",
+        "console": "console",
+        "guesthopper": "guesthopper",
+        "libhc": "libhc",
+        "libnvram": "libnvram",
+        "nixpkgs": "nixpkgs",
+        "vpnguin": "vpnguin"
+      }
+    },
+    "vpnguin": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1782069902,
+        "narHash": "sha256-XmHjL+DVpEgQi9/6RI4SeoN3QLI0jsin+YkmYkpGmAg=",
+        "owner": "rehosting",
+        "repo": "vpnguin",
+        "rev": "9621015f7e32a464c9474afed1484bc417e36674",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rehosting",
+        "repo": "vpnguin",
+        "rev": "9621015f7e32a464c9474afed1484bc417e36674",
+        "type": "github"
       }
     }
   },
