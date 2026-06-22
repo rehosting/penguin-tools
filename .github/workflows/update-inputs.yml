@@ -50,6 +50,10 @@ jobs:
         id: bump
         run: |
           set -uo pipefail
+          # GitHub runs run-steps with `bash -e`; we deliberately handle failures
+          # via empty-string checks (e.g. releases/latest 404s for release-less
+          # repos like libhc, which then fall back to tag/HEAD), so disable -e.
+          set +e
           api() {
             curl -fsSL \
               -H "Authorization: Bearer $GH_TOKEN" \
