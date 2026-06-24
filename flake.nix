@@ -13,11 +13,11 @@
   # Forked guest utilities, consumed as plain source trees (no flake of their
   # own). SPIKE: console only for now, to prove the cross-build pattern.
   inputs.console = {
-    url = "github:rehosting/console/c744652da5dcd256268257035d9115e7cfdaa2a4";
+    url = "github:rehosting/console/e84247c974198c0d793f0dd687d6c469881c31c9";
     flake = false;
   };
   inputs.guesthopper = {
-    url = "github:rehosting/guesthopper/7849568415549330c8d714f118105548cb626728";
+    url = "github:rehosting/guesthopper/accd54780869e68e5242fc1fd5e972d2071f680b";
     flake = false;
   };
   # libnvram needs no cross-compile: penguin compiles nvram.c -> lib_inject.so
@@ -28,11 +28,11 @@
     flake = false;
   };
   inputs.vpnguin = {
-    url = "github:rehosting/vpnguin/9621015f7e32a464c9474afed1484bc417e36674";
+    url = "github:rehosting/vpnguin/07f6de9bad32fbfb74c26ac0f80e3d5f3caf336b";
     flake = false;
   };
   inputs.busybox = {
-    url = "github:rehosting/busybox/28a8debc2b974880c814a8cd6db28d14ff7c772b";
+    url = "github:rehosting/busybox/4d3876723484b2a558b7b0179bb40c7d9e184982";
     flake = false;
   };
   # libhc: hypercall.h header the busybox fork includes (its submodule).
