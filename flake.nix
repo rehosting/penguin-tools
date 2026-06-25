@@ -90,6 +90,37 @@
             stripTests = true;
             stripTkinter = true;
           };
+          # gdb pinned to 16.3 rather than nixpkgs' 17.1: 17.1 does not
+          # cross-build across our arch set (aarch64 struct user_gcs
+          # redefinition vs modern kernel headers, ser-unix.c custom-baudrate
+          # termios fields, and gdbserver's in-process agent erroring out on
+          # armv7l). 16.3 is what Alpine/Buildroot ship and predates all of
+          # that. Plus: disable the (unused, not-everywhere-supported)
+          # in-process agent, fix the mips sgidefs include, and disable
+          # debuginfod -- a client feature that fetches symbols from a remote
+          # server, which also drops the heavy elfutils -> libmicrohttpd ->
+          # gnutls chain and shrinks the closure. pythonSupport and
+          # source-highlight are left on: we ship the full gdb client below, so
+          # its pretty-printers and source syntax coloring stay.
+          #
+          # Point gdb's python at slimPython (rather than the default full
+          # python3) so the closure carries a single python: gdb's
+          # pretty-printers only need the stdlib, which slimPython keeps, so
+          # this avoids shipping a second ~114M unstripped python alongside the
+          # manifest's slim one.
+          gdbDrv = (crossPkgs.gdbHostCpuOnly.override { enableDebuginfod = false; python3 = slimPython; }).overrideAttrs (prev: {
+            version = "16.3";
+            src = crossPkgs.fetchurl {
+              url = "mirror://gnu/gdb/gdb-16.3.tar.xz";
+              hash = "sha256-vPzQlVKKmHkXrPn/8/FnIYFpSSbMGNYJyZ0AQsACJMU=";
+            };
+            postPatch = (prev.postPatch or "") + ''
+              substituteInPlace gdb/mips-linux-nat.c \
+                --replace '<sgidefs.h>' '<asm/sgidefs.h>' \
+                --replace '_ABIO32' '1'
+            '';
+            configureFlags = (prev.configureFlags or [ ]) ++ [ "--disable-inprocess-agent" ];
+          });
           base = {
             python3 = {
               drv = slimPython;
@@ -99,52 +130,17 @@
               drv = crossPkgs.strace;
               exe = "${crossPkgs.strace}/bin/strace";
             };
-            # gdb pinned to 16.3 rather than nixpkgs' 17.1: 17.1 does not
-            # cross-build across our arch set (aarch64 struct user_gcs
-            # redefinition vs modern kernel headers, ser-unix.c custom-baudrate
-            # termios fields, and gdbserver's in-process agent erroring out on
-            # armv7l). 16.3 is what Alpine/Buildroot ship and predates all of
-            # that. Plus: disable the (unused, not-everywhere-supported)
-            # in-process agent, fix the mips sgidefs include, and disable
-            # debuginfod -- a gdb *client* feature a guest gdbserver never uses,
-            # which also drops the heavy elfutils -> libmicrohttpd -> gnutls
-            # chain and shrinks the closure.
-            #
-            # Also drop source-highlight (gdb's nixpkgs expr links it
-            # unconditionally, no flag): it is the gdb client's source syntax
-            # coloring, which gdbserver never uses, and it is the *sole* path by
-            # which boost (~15M) and icu4c (~39M) enter the closure. Filtering
-            # it out of buildInputs makes gdb's configure auto-disable it and
-            # removes ~57M/arch of dead weight.
-            #
-            # And disable pythonSupport: it is gdb-client scripting only, and it
-            # drags in the *full* (unstripped) python3 -- defeating slimPython
-            # above by shipping a second 114M python in the closure. gdbserver
-            # needs no python, so turning it off leaves only slimPython.
-            gdbserver =
-              let
-                gdb = (crossPkgs.gdbHostCpuOnly.override { enableDebuginfod = false; pythonSupport = false; }).overrideAttrs (prev: {
-                  buildInputs = lib.filter
-                    (p: !(lib.hasInfix "source-highlight" (p.name or "")))
-                    (prev.buildInputs or [ ]);
-                  version = "16.3";
-                  src = crossPkgs.fetchurl {
-                    url = "mirror://gnu/gdb/gdb-16.3.tar.xz";
-                    hash = "sha256-vPzQlVKKmHkXrPn/8/FnIYFpSSbMGNYJyZ0AQsACJMU=";
-                  };
-                  postPatch = (prev.postPatch or "") + ''
-                    substituteInPlace gdb/mips-linux-nat.c \
-                      --replace '<sgidefs.h>' '<asm/sgidefs.h>' \
-                      --replace '_ABIO32' '1'
-                  '';
-                  configureFlags = (prev.configureFlags or [ ]) ++ [ "--disable-inprocess-agent" ];
-                  meta = (prev.meta or { }) // { mainProgram = "gdbserver"; };
-                });
-              in
-              {
-                drv = gdb;
-                exe = "${gdb}/bin/gdbserver";
-              };
+            # Ship both the full gdb client (for on-guest interactive debugging)
+            # and gdbserver (for remote debugging from the host), from the one
+            # gdbDrv built above.
+            gdb = {
+              drv = gdbDrv;
+              exe = "${gdbDrv}/bin/gdb";
+            };
+            gdbserver = {
+              drv = gdbDrv;
+              exe = "${gdbDrv}/bin/gdbserver";
+            };
             # iptables is a single multi-call package (xtables-*-multi) that
             # dispatches on argv[0]; one derivation provides both the nft and
             # legacy entry points, so ship both exes from the same closure.
