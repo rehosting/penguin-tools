@@ -79,10 +79,21 @@
 
       mkTools = archKey: crossPkgs:
         let
+          # python3 trimmed for the guest: drop the static-lib/build "config"
+          # dir (~40M of libpython.a + Makefiles, only needed to compile C
+          # extensions *against* python, which the guest never does), the IDLE
+          # GUI, the stdlib test suite, and tkinter. Pure size; the interpreter
+          # and stdlib the guest actually runs are untouched.
+          slimPython = crossPkgs.python3.override {
+            stripConfig = true;
+            stripIdlelib = true;
+            stripTests = true;
+            stripTkinter = true;
+          };
           base = {
             python3 = {
-              drv = crossPkgs.python3;
-              exe = "${crossPkgs.python3}/bin/python3";
+              drv = slimPython;
+              exe = "${slimPython}/bin/python3";
             };
             strace = {
               drv = crossPkgs.strace;
@@ -98,9 +109,24 @@
             # debuginfod -- a gdb *client* feature a guest gdbserver never uses,
             # which also drops the heavy elfutils -> libmicrohttpd -> gnutls
             # chain and shrinks the closure.
+            #
+            # Also drop source-highlight (gdb's nixpkgs expr links it
+            # unconditionally, no flag): it is the gdb client's source syntax
+            # coloring, which gdbserver never uses, and it is the *sole* path by
+            # which boost (~15M) and icu4c (~39M) enter the closure. Filtering
+            # it out of buildInputs makes gdb's configure auto-disable it and
+            # removes ~57M/arch of dead weight.
+            #
+            # And disable pythonSupport: it is gdb-client scripting only, and it
+            # drags in the *full* (unstripped) python3 -- defeating slimPython
+            # above by shipping a second 114M python in the closure. gdbserver
+            # needs no python, so turning it off leaves only slimPython.
             gdbserver =
               let
-                gdb = (crossPkgs.gdbHostCpuOnly.override { enableDebuginfod = false; }).overrideAttrs (prev: {
+                gdb = (crossPkgs.gdbHostCpuOnly.override { enableDebuginfod = false; pythonSupport = false; }).overrideAttrs (prev: {
+                  buildInputs = lib.filter
+                    (p: !(lib.hasInfix "source-highlight" (p.name or "")))
+                    (prev.buildInputs or [ ]);
                   version = "16.3";
                   src = crossPkgs.fetchurl {
                     url = "mirror://gnu/gdb/gdb-16.3.tar.xz";
