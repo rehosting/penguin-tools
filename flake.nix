@@ -99,16 +99,24 @@
           # in-process agent, fix the mips sgidefs include, and disable
           # debuginfod -- a client feature that fetches symbols from a remote
           # server, which also drops the heavy elfutils -> libmicrohttpd ->
-          # gnutls chain and shrinks the closure. pythonSupport and
-          # source-highlight are left on: we ship the full gdb client below, so
-          # its pretty-printers and source syntax coloring stay.
+          # gnutls chain and shrinks the closure.
           #
-          # Point gdb's python at slimPython (rather than the default full
-          # python3) so the closure carries a single python: gdb's
-          # pretty-printers only need the stdlib, which slimPython keeps, so
-          # this avoids shipping a second ~114M unstripped python alongside the
-          # manifest's slim one.
+          # pythonSupport is left ON -- it powers gdb's pretty-printers, the
+          # genuinely useful client feature. Its python is pointed at slimPython
+          # (rather than the default full python3) so the closure carries a
+          # single python: pretty-printers only need the stdlib, which slimPython
+          # keeps, avoiding a second ~114M unstripped python.
+          #
+          # source-highlight is dropped, though: gdb's nixpkgs expr links it
+          # unconditionally (no flag), but all it does is syntax-color source
+          # listings -- and it is the *sole* path by which boost (~15M) and
+          # icu4c (~39M) enter the closure. Filtering it out of buildInputs makes
+          # gdb's configure auto-disable it, removing ~57M/arch while leaving
+          # pretty-printers untouched.
           gdbDrv = (crossPkgs.gdbHostCpuOnly.override { enableDebuginfod = false; python3 = slimPython; }).overrideAttrs (prev: {
+            buildInputs = lib.filter
+              (p: !(lib.hasInfix "source-highlight" (p.name or "")))
+              (prev.buildInputs or [ ]);
             version = "16.3";
             src = crossPkgs.fetchurl {
               url = "mirror://gnu/gdb/gdb-16.3.tar.xz";
@@ -178,10 +186,11 @@
         base // (if builtins.elem archKey ltraceUnsupported then { } else ltrace);
 
       mkArchClosure = archKey:
-        import ./src/mk-arch-closure.nix {
-          inherit pkgs;
+        let crossPkgs = mkCrossPkgs archKey;
+        in import ./src/mk-arch-closure.nix {
+          inherit pkgs crossPkgs;
           archSpec = archMatrix.${archKey};
-          tools = mkTools archKey (mkCrossPkgs archKey);
+          tools = mkTools archKey crossPkgs;
         };
 
       archClosures = lib.mapAttrs (archKey: _: mkArchClosure archKey) archMatrix;
