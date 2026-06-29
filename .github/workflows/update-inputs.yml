@@ -30,21 +30,20 @@ jobs:
       - name: Prepare runner directories
         run: mkdir -p "$TMPDIR" "$XDG_CACHE_HOME"
 
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y curl jq xz-utils
+      - name: Install jq (used by the re-pin step)
+        run: sudo apt-get update && sudo apt-get install -y jq
 
-      - uses: cachix/install-nix-action@v27
+      - name: Set up Nix (shared rehosting/ci action)
+        uses: rehosting/ci/actions/nix-setup@v1
         with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-          extra_nix_config: |
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          extra-nix-config: |
             max-jobs = 8
             cores = 8
-
-      - name: Configure Cachix
-        uses: cachix/cachix-action@v16
-        with:
-          name: rehosting-tools
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          cache-backend: cachix
+          cachix-name: rehosting-tools
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          enable-kvm: "false"
 
       - name: Re-pin inputs to latest releases
         id: bump
