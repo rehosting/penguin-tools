@@ -32,7 +32,7 @@
     flake = false;
   };
   inputs.busybox = {
-    url = "github:rehosting/busybox/4d3876723484b2a558b7b0179bb40c7d9e184982";
+    url = "github:rehosting/busybox/a435ba5eb5d8d4bc48ca2c0631893526582d6808";
     flake = false;
   };
   # libhc: hypercall.h header the busybox fork includes (its submodule).
