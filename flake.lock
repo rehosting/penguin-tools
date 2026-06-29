@@ -3,17 +3,17 @@
     "busybox": {
       "flake": false,
       "locked": {
-        "lastModified": 1782079004,
-        "narHash": "sha256-RoVVbXl1y1PbIQSzLJNePsQMlpEoySwjwV4bHku2ez0=",
+        "lastModified": 1782747027,
+        "narHash": "sha256-M36dRAdtphxA30D7o6/dFr6m2fdnhQkwCwTSqM8zyk4=",
         "owner": "rehosting",
         "repo": "busybox",
-        "rev": "4d3876723484b2a558b7b0179bb40c7d9e184982",
+        "rev": "a435ba5eb5d8d4bc48ca2c0631893526582d6808",
         "type": "github"
       },
       "original": {
         "owner": "rehosting",
         "repo": "busybox",
-        "rev": "4d3876723484b2a558b7b0179bb40c7d9e184982",
+        "rev": "a435ba5eb5d8d4bc48ca2c0631893526582d6808",
         "type": "github"
       }
     },
