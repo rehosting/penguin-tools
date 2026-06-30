@@ -59,14 +59,40 @@
       };
       lib = pkgs.lib;
 
-      # Generic cross-compilation fixes (e.g. gnutls' target-binary doc build).
-      crossOverlays = import ./src/cross-overlays.nix;
+      # Generic cross-compilation fixes (gnutls' target-binary doc build, the
+      # gobject-introspection checkPhase). These also have to reach buildPackages
+      # (g-i is a native build tool), so they go in `overlays`.
+      hostOverlays = import ./src/cross-overlays.nix;
+
+      # Runtime-gate the time vDSO in glibc for 32-bit mips/arm guests: on a
+      # pre-5.1 guest kernel PANDA emulates the clocksource unreliably, so
+      # glibc's clock_gettime spins or ENOSYSes (penguin#876). The patch leaves
+      # the dl_vdso_* clock pointers NULL below kernel 5.1.0 (falling back to the
+      # syscall) and keeps the vDSO fast path at/above it. Passed via
+      # `crossOverlays`, which apply only to the cross/target package set -- so it
+      # patches the guest glibc shipped in the closure, never the x86_64
+      # build-host glibc (no native-toolchain rebuild).
+      glibcVdsoGateOverlay = final: prev: {
+        glibc = prev.glibc.overrideAttrs (o: {
+          patches = (o.patches or [ ]) ++ [ ./src/patches/force-syscall-clock.patch ];
+        });
+      };
+
+      # The 32-bit arches that present the issue. 64-bit arches use the native
+      # 64-bit clock_gettime and keep the pinned glibc (byte-identical closures).
+      # Selection happens here, not inside the overlay: x86_64 is built as a
+      # degenerate cross (target == build), where a non-empty crossOverlays --
+      # even a no-op one -- triggers a nixpkgs stdenv infinite recursion, so
+      # unaffected arches must receive an empty list.
+      glibcPatchArches = [ "mipsel" "mipseb" "armel" ];
 
       mkCrossPkgs = archKey:
         import nixpkgs {
           inherit system;
           config.allowUnsupportedSystem = true;
-          overlays = crossOverlays;
+          overlays = hostOverlays;
+          crossOverlays =
+            lib.optional (builtins.elem archKey glibcPatchArches) glibcVdsoGateOverlay;
           crossSystem = archMatrix.${archKey}.crossSystem;
         };
 

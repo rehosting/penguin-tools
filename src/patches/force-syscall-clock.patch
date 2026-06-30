@@ -1,0 +1,58 @@
+--- a/sysdeps/unix/sysv/linux/dl-vdso-setup.h
++++ b/sysdeps/unix/sysv/linux/dl-vdso-setup.h
+@@ -19,10 +19,55 @@
+ #ifndef _DL_VDSO_INIT_H
+ #define _DL_VDSO_INIT_H
+ 
++#include <sys/utsname.h>
++
++/* PANDA-QEMU emulates the MIPS/ARM RDHWR/CP0-Count clocksource that the time
++   vDSO relies on unreliably on pre-5.1 guest kernels: vDSO clock reads either
++   spin in the time64 retry path or surface ENOSYS.  Detect the running kernel
++   once at startup and, below 5.1.0, refuse to publish the time vDSO pointers
++   so glibc's own (vdso == NULL) checks fall through to the plain
++   clock_gettime64 / legacy clock_gettime syscall path.  At or above 5.1.0 the
++   vDSO is published exactly as upstream.  */
++static inline int __attribute__ ((always_inline))
++vdso_clock_usable (void)
++{
++  /* Computed once and memoized: setup_vdso_pointers () already runs a single
++     time per process at startup, and the cache keeps __uname () to at most one
++     call even if this helper is ever reused.  Init runs single-threaded, so a
++     plain static needs no locking.  -1 unknown, 0 no, 1 yes.  */
++  static int cached = -1;
++  if (cached < 0)
++    {
++      struct utsname buf;
++      const char *p = &buf.release[0];
++      int kernel = 0;
++      int val;
++
++      if (__uname (&buf) < 0)
++        cached = 1;           /* Unknown kernel: assume modern, keep vDSO.  */
++      else
++        {
++          for (int shift = 16; shift >= 0; shift -= 8)
++            {
++              for (val = 0; *p >= '0' && *p <= '9'; p++)
++                val = val * 10 + *p - '0';
++              kernel |= (val & 255) << shift;
++              if (*p++ != '.')
++                break;
++            }
++          cached = kernel >= 0x050100;  /* 5.1.0 == __ASSUME_TIME64_SYSCALLS.  */
++        }
++    }
++  return cached;
++}
++
+ /* Initialize the VDSO functions pointers.  */
+ static inline void __attribute__ ((always_inline))
+ setup_vdso_pointers (void)
+ {
++  if (!vdso_clock_usable ())
++    return;                   /* Leave all dl_vdso_* pointers NULL.  */
++
+ #ifdef HAVE_CLOCK_GETTIME_VSYSCALL
+   GLRO(dl_vdso_clock_gettime) = dl_vdso_vsym (HAVE_CLOCK_GETTIME_VSYSCALL);
+ #endif
