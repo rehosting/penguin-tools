@@ -27,13 +27,12 @@
     url = "github:rehosting/libnvram/e013c0686facbb62df09b30d0d5b92dd75fd4d58";
     flake = false;
   };
-  # Pinned to v1.0.26 (4-field host event line). vpnguin v1.0.27 added a required
-  # 5th "iface" column (the owned-interface/WAN-bridge protocol) that penguin's
-  # vpn.py only emits once penguin #865 lands; shipping v1.0.27 here breaks the
-  # VPN datapath (host `vpn` rejects every event line). Excluded from the
-  # update-inputs auto-bump until #865 merges -- see .github/workflows/update-inputs.yml.
+  # Pinned to v1.0.27 (5-field host event line), which added the "iface" column
+  # for the owned-interface/WAN-bridge datapath. penguin's vpn.py emits the
+  # 5-field line as of penguin #865, so this is now the matching pair. Back on
+  # the update-inputs auto-bump (see .github/workflows/update-inputs.yml).
   inputs.vpnguin = {
-    url = "github:rehosting/vpnguin/1afbe2865582af0219462d4088793faffa97c71f";
+    url = "github:rehosting/vpnguin/07f6de9bad32fbfb74c26ac0f80e3d5f3caf336b";
     flake = false;
   };
   inputs.busybox = {

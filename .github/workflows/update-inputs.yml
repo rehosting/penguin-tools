@@ -61,18 +61,13 @@ jobs:
           }
 
           # flake input name -> owner/repo it tracks
-          #
-          # vpnguin is intentionally omitted: it is pinned to v1.0.26 (4-field
-          # host event line) in flake.nix. Its latest tag (v1.0.27+) added the
-          # owned-interface 5th column that penguin's vpn.py only emits once
-          # penguin #865 lands, so auto-bumping it breaks the VPN datapath.
-          # Re-add it here when #865 merges.
           declare -A REPOS=(
             [console]=rehosting/console
             [guesthopper]=rehosting/guesthopper
             [libnvram]=rehosting/libnvram
             [busybox]=rehosting/busybox
             [libhc]=panda-re/libhc
+            [vpnguin]=rehosting/vpnguin
           )
 
           {
