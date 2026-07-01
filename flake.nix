@@ -27,12 +27,13 @@
     url = "github:rehosting/libnvram/e013c0686facbb62df09b30d0d5b92dd75fd4d58";
     flake = false;
   };
-  # Pinned to v1.0.27 (5-field host event line), which added the "iface" column
-  # for the owned-interface/WAN-bridge datapath. penguin's vpn.py emits the
-  # 5-field line as of penguin #865, so this is now the matching pair. Back on
-  # the update-inputs auto-bump (see .github/workflows/update-inputs.yml).
+  # Pinned to v1.0.28 (5-field host event line + big-endian TAP fix). v1.0.27
+  # added the "iface" column for the owned-interface/WAN-bridge datapath; v1.0.28
+  # fixes the tap failing to open (TUNSETIFF EINVAL) on big-endian guest arches.
+  # penguin's vpn.py emits the 5-field line as of penguin #865. On the
+  # update-inputs auto-bump (see .github/workflows/update-inputs.yml).
   inputs.vpnguin = {
-    url = "github:rehosting/vpnguin/07f6de9bad32fbfb74c26ac0f80e3d5f3caf336b";
+    url = "github:rehosting/vpnguin/f98e9d7c129ebb5c60798f4f29a8dcd2c5db9630";
     flake = false;
   };
   inputs.busybox = {

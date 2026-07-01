@@ -115,17 +115,17 @@
     "vpnguin": {
       "flake": false,
       "locked": {
-        "lastModified": 1782311508,
-        "narHash": "sha256-WEL7uPbUhU/X5mRHnBsRW68l+ppryB6cUkM9axAXRcc=",
+        "lastModified": 1782943577,
+        "narHash": "sha256-zMYipzTF9tkHrM7OH4fvq38+HFhmQI835J2GuHVba9o=",
         "owner": "rehosting",
         "repo": "vpnguin",
-        "rev": "07f6de9bad32fbfb74c26ac0f80e3d5f3caf336b",
+        "rev": "f98e9d7c129ebb5c60798f4f29a8dcd2c5db9630",
         "type": "github"
       },
       "original": {
         "owner": "rehosting",
         "repo": "vpnguin",
-        "rev": "07f6de9bad32fbfb74c26ac0f80e3d5f3caf336b",
+        "rev": "f98e9d7c129ebb5c60798f4f29a8dcd2c5db9630",
         "type": "github"
       }
     }
