@@ -68,41 +68,35 @@
       # pre-5.1 guest kernel PANDA emulates the clocksource unreliably, so
       # glibc's clock_gettime spins or ENOSYSes (penguin#876). The patch leaves
       # the dl_vdso_* clock pointers NULL below kernel 5.1.0 (falling back to the
-      # syscall) and keeps the vDSO fast path at/above it. Passed via
-      # `crossOverlays`, which apply only to the cross/target package set -- so it
-      # patches the guest glibc shipped in the closure, never the x86_64
-      # build-host glibc (no native-toolchain rebuild).
-      glibcVdsoGateOverlay = final: prev: {
-        glibc = prev.glibc.overrideAttrs (o: {
-          patches = (o.patches or [ ]) ++ [ ./src/patches/force-syscall-clock.patch ];
-        });
-      };
-
-      # The 32-bit arches that present the issue. 64-bit arches use the native
-      # 64-bit clock_gettime and keep the pinned glibc (byte-identical closures).
+      # syscall) and keeps the vDSO fast path at/above it.
       #
-      # Selection happens HERE, keyed off archKey -- not inside the overlay via a
-      # platform predicate. x86_64's crossSystem (x86_64-unknown-linux-gnu) is a
-      # *degenerate* cross: same CPU and libc family as the x86_64-linux build
-      # host, so the cross glibc resolves back to the build stdenv's own glibc.
-      # On that degenerate cross, ANY non-empty crossOverlays list -- even a
-      # no-op `(final: prev: {})` that never touches glibc -- makes forcing the
-      # top-level `glibc` attribute infinitely recurse (verified by nix eval:
-      # crossOverlays=[] evals glibc fine, crossOverlays=[{}] recurses), and the
-      # x86_64 closure forces that attribute. So x86_64 must get an EMPTY list,
-      # which is only expressible by gating the *list* outside the overlay.
-      # (hyperfs uses a non-empty crossOverlays for x86_64 without trouble
-      # because its x86_64 is x86_64-linux-MUSL -- a genuine cross whose glibc is
-      # a distinct build -- and it never overrides/forces glibc; not our case.)
+      # *** DEMO BRANCH: THIS VARIANT INFINITELY RECURSES. ***
+      # Here the arch gate lives INSIDE the overlay (nit #6's requested form):
+      # the overlay is applied to EVERY arch's crossOverlays and returns {} for
+      # the arches that don't need the patch. That means crossOverlays is a
+      # non-empty list even for x86_64 -- whose crossSystem is a *degenerate*
+      # glibc cross (same CPU + libc family as the build host, so the cross glibc
+      # resolves back to the build stdenv's own glibc). On that degenerate cross
+      # a non-empty crossOverlays -- even this {}-returning one -- makes forcing
+      # the top-level `glibc` attribute recurse, and the x86_64 closure forces
+      # it. `nix eval .#closure-x86_64.drvPath` throws "infinite recursion".
+      # (closure-mipsel still evals fine.) The shipping fix keeps the gate
+      # OUTSIDE so x86_64 gets a literally empty crossOverlays list.
       glibcPatchArches = [ "mipsel" "mipseb" "armel" ];
+
+      glibcVdsoGateOverlay = archKey: final: prev:
+        lib.optionalAttrs (builtins.elem archKey glibcPatchArches) {
+          glibc = prev.glibc.overrideAttrs (o: {
+            patches = (o.patches or [ ]) ++ [ ./src/patches/force-syscall-clock.patch ];
+          });
+        };
 
       mkCrossPkgs = archKey:
         import nixpkgs {
           inherit system;
           config.allowUnsupportedSystem = true;
           overlays = hostOverlays;
-          crossOverlays =
-            lib.optional (builtins.elem archKey glibcPatchArches) glibcVdsoGateOverlay;
+          crossOverlays = [ (glibcVdsoGateOverlay archKey) ];
           crossSystem = archMatrix.${archKey}.crossSystem;
         };
 
