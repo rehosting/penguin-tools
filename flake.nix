@@ -80,10 +80,20 @@
 
       # The 32-bit arches that present the issue. 64-bit arches use the native
       # 64-bit clock_gettime and keep the pinned glibc (byte-identical closures).
-      # Selection happens here, not inside the overlay: x86_64 is built as a
-      # degenerate cross (target == build), where a non-empty crossOverlays --
-      # even a no-op one -- triggers a nixpkgs stdenv infinite recursion, so
-      # unaffected arches must receive an empty list.
+      #
+      # Selection happens HERE, keyed off archKey -- not inside the overlay via a
+      # platform predicate. x86_64's crossSystem (x86_64-unknown-linux-gnu) is a
+      # *degenerate* cross: same CPU and libc family as the x86_64-linux build
+      # host, so the cross glibc resolves back to the build stdenv's own glibc.
+      # On that degenerate cross, ANY non-empty crossOverlays list -- even a
+      # no-op `(final: prev: {})` that never touches glibc -- makes forcing the
+      # top-level `glibc` attribute infinitely recurse (verified by nix eval:
+      # crossOverlays=[] evals glibc fine, crossOverlays=[{}] recurses), and the
+      # x86_64 closure forces that attribute. So x86_64 must get an EMPTY list,
+      # which is only expressible by gating the *list* outside the overlay.
+      # (hyperfs uses a non-empty crossOverlays for x86_64 without trouble
+      # because its x86_64 is x86_64-linux-MUSL -- a genuine cross whose glibc is
+      # a distinct build -- and it never overrides/forces glibc; not our case.)
       glibcPatchArches = [ "mipsel" "mipseb" "armel" ];
 
       mkCrossPkgs = archKey:
