@@ -15,6 +15,16 @@
     compatNames = [ "intel64" ];
     crossSystem = {
       config = "x86_64-unknown-linux-gnu";
+      # x86_64's cross target shares its config string with the x86_64-linux
+      # build host -- a degenerate (same-system) cross. nixpkgs decides "are we
+      # cross compiling?" inconsistently in that case: some paths compare only
+      # localSystem vs crossSystem (=> "native"), others also honour
+      # crossOverlays (=> "cross"). We pass a non-empty crossOverlays on every
+      # arch (the glibc vDSO gate in flake.nix), so the two disagree and the
+      # glibc fixpoint recurses. Adding any extra field makes the elaborated
+      # crossSystem differ from localSystem, so every check agrees on "cross"
+      # and the recursion goes away. See NixOS/nixpkgs#265121.
+      dummyValueToForceCrossCompiling = true;
     };
     muslCrossSystem = {
       config = "x86_64-linux-musl";
