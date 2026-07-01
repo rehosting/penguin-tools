@@ -69,28 +69,36 @@
       # glibc's clock_gettime spins or ENOSYSes (penguin#876). The patch leaves
       # the dl_vdso_* clock pointers NULL below kernel 5.1.0 (falling back to the
       # syscall) and keeps the vDSO fast path at/above it.
-      #
-      # The overlay self-gates on archKey: it patches the cross/target glibc for
-      # the 32-bit arches that present the issue and is a no-op ({}) for the
-      # rest, which keep the pinned glibc. It is applied to every arch's
-      # crossOverlays -- the arch check lives inside the overlay. (This requires
-      # x86_64 to force cross-compilation; see the dummyValueToForceCrossCompiling
-      # note in src/archs.nix and NixOS/nixpkgs#265121.)
-      glibcPatchArches = [ "mipsel" "mipseb" "armel" ];
+      glibcVdsoGateOverlay = final: prev: {
+        glibc = prev.glibc.overrideAttrs (o: {
+          patches = (o.patches or [ ]) ++ [ ./src/patches/force-syscall-clock.patch ];
+        });
+      };
 
-      glibcVdsoGateOverlay = archKey: final: prev:
-        lib.optionalAttrs (builtins.elem archKey glibcPatchArches) {
-          glibc = prev.glibc.overrideAttrs (o: {
-            patches = (o.patches or [ ]) ++ [ ./src/patches/force-syscall-clock.patch ];
-          });
-        };
+      # The 32-bit arches that present the issue. 64-bit arches use the native
+      # 64-bit clock_gettime and keep the pinned glibc (byte-identical closures).
+      #
+      # The overlay is selected per-arch HERE (not inside the overlay via a
+      # platform predicate), so x86_64 receives an EMPTY crossOverlays list.
+      # That is mandatory, not stylistic: x86_64's crossSystem config equals the
+      # x86_64-linux build host's -- a degenerate same-system cross that nixpkgs
+      # mishandles (NixOS/nixpkgs#265121). A non-empty crossOverlays on x86_64
+      # first makes the glibc fixpoint infinitely recurse at eval; and even if
+      # forced past that (dummyValueToForceCrossCompiling, turning x86_64 into a
+      # genuine self-cross), the *build* then fails -- the same-system cross gcc
+      # wrapper picks the unwrapped build compiler's target-prefixed gcc and
+      # "cannot create executables" (attr/coreutils/... all fail). Unlike our
+      # real crosses (different CPU, wrapper fine), x86_64 must stay a native
+      # build -> empty crossOverlays -> the list is gated from outside.
+      glibcPatchArches = [ "mipsel" "mipseb" "armel" ];
 
       mkCrossPkgs = archKey:
         import nixpkgs {
           inherit system;
           config.allowUnsupportedSystem = true;
           overlays = hostOverlays;
-          crossOverlays = [ (glibcVdsoGateOverlay archKey) ];
+          crossOverlays =
+            lib.optional (builtins.elem archKey glibcPatchArches) glibcVdsoGateOverlay;
           crossSystem = archMatrix.${archKey}.crossSystem;
         };
 
