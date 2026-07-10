@@ -102,12 +102,17 @@
           # the full arch set (incl. the C-extension ones cffi/psutil/netifaces).
           # gdb below keeps the bare slimPython for its pretty-printers (a
           # withPackages env would drag these into gdb's closure for nothing).
+          #
+          # NB scapy is intentionally NOT here: its nixpkgs cross-closure pulls a
+          # native audio chain (sox -> libao -> libcap -> go) and `go` does not
+          # cross-compile for mipsel ("cannot find runtime/cgo", -mips32r2
+          # conflict), breaking the 32-bit-MIPS closure. pyroute2 (netlink) + dpkt
+          # (packet parsing) cover the networking need without that closure.
           guestPython = slimPython.withPackages (ps: with ps; [
             requests    # HTTP client
             cffi        # C interop / poke libc & structs from Python
             psutil      # processes, memory, network connections, system stats
             netifaces   # interface / address enumeration
-            scapy       # packet crafting + sniffing
             pyroute2    # netlink: links, routes, netns, tc
             dpkt        # fast packet parsing
           ]);
