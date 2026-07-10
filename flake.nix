@@ -97,6 +97,20 @@
             stripTests = true;
             stripTkinter = true;
           };
+          # The guest interpreter ships a curated debugging / system / networking
+          # toolkit on top of the slim stdlib. All verified to cross-build across
+          # the full arch set (incl. the C-extension ones cffi/psutil/netifaces).
+          # gdb below keeps the bare slimPython for its pretty-printers (a
+          # withPackages env would drag these into gdb's closure for nothing).
+          guestPython = slimPython.withPackages (ps: with ps; [
+            requests    # HTTP client
+            cffi        # C interop / poke libc & structs from Python
+            psutil      # processes, memory, network connections, system stats
+            netifaces   # interface / address enumeration
+            scapy       # packet crafting + sniffing
+            pyroute2    # netlink: links, routes, netns, tc
+            dpkt        # fast packet parsing
+          ]);
           # gdb pinned to 16.3 rather than nixpkgs' 17.1: 17.1 does not
           # cross-build across our arch set (aarch64 struct user_gcs
           # redefinition vs modern kernel headers, ser-unix.c custom-baudrate
@@ -138,8 +152,8 @@
           });
           base = {
             python3 = {
-              drv = slimPython;
-              exe = "${slimPython}/bin/python3";
+              drv = guestPython;
+              exe = "${guestPython}/bin/python3";
             };
             strace = {
               drv = crossPkgs.strace;
