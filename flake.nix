@@ -10,43 +10,13 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/b6067cc0127d4db9c26c79e4de0513e58d0c40c9";
 
-  # Forked guest utilities, consumed as plain source trees (no flake of their
-  # own). SPIKE: console only for now, to prove the cross-build pattern.
-  inputs.console = {
-    url = "github:rehosting/console/e84247c974198c0d793f0dd687d6c469881c31c9";
-    flake = false;
-  };
-  inputs.guesthopper = {
-    url = "github:rehosting/guesthopper/accd54780869e68e5242fc1fd5e972d2071f680b";
-    flake = false;
-  };
-  # libnvram needs no cross-compile: penguin compiles nvram.c -> lib_inject.so
-  # itself (clang-20, per project). We just vendor its source tree, replacing
-  # the standalone GitHub source pull in penguin's Dockerfile.
-  inputs.libnvram = {
-    url = "github:rehosting/libnvram/e013c0686facbb62df09b30d0d5b92dd75fd4d58";
-    flake = false;
-  };
-  # Pinned to v1.0.28 (5-field host event line + big-endian TAP fix). v1.0.27
-  # added the "iface" column for the owned-interface/WAN-bridge datapath; v1.0.28
-  # fixes the tap failing to open (TUNSETIFF EINVAL) on big-endian guest arches.
-  # penguin's vpn.py emits the 5-field line as of penguin #865. On the
-  # update-inputs auto-bump (see .github/workflows/update-inputs.yml).
-  inputs.vpnguin = {
-    url = "github:rehosting/vpnguin/f98e9d7c129ebb5c60798f4f29a8dcd2c5db9630";
-    flake = false;
-  };
-  inputs.busybox = {
-    url = "github:rehosting/busybox/a435ba5eb5d8d4bc48ca2c0631893526582d6808";
-    flake = false;
-  };
-  # libhc: hypercall.h header the busybox fork includes (its submodule).
-  inputs.libhc = {
-    url = "github:panda-re/libhc/b2f2efbd948faca9e242ae410e035c0065ec433a";
-    flake = false;
-  };
+  # The forked guest utilities (console, busybox, guesthopper, vpnguin) and the
+  # libnvram source used to be vendored + cross-built here. They now each build
+  # themselves via their own flake and penguin consumes them directly, so
+  # penguin-tools is back to what it genuinely builds: the debugging-tool
+  # closures (python3/strace/gdb/ltrace/iptables) + drop-in musl sysroots.
 
-  outputs = { self, nixpkgs, console, guesthopper, libnvram, vpnguin, busybox, libhc }:
+  outputs = { self, nixpkgs }:
     let
       system = "x86_64-linux";
       archMatrix = import ./src/archs.nix;
@@ -232,100 +202,6 @@
 
       archClosures = lib.mapAttrs (archKey: _: mkArchClosure archKey) archMatrix;
 
-      # --- Guest C utilities (SPIKE: console) -------------------------------
-      # Built as static-musl binaries via muslCrossSystem. console's Makefile
-      # hardcodes -march on MIPS, but archs.nix already pins gcc.arch per arch
-      # (mips32r2/mips64r2), matching the debugging-tool closures, so we let the
-      # cross stdenv set -march rather than fighting it with an extra flag.
-      mkConsole = archKey:
-        import ./src/mk-guest-c-tool.nix {
-          crossPkgs = mkMuslCrossPkgs archKey;
-          src = console;
-          pname = "console-${archMatrix.${archKey}.penguinName}";
-          sources = [ "console.c" ];
-          outName = "console";
-          defines = {
-            SHELL = "/igloo/utils/sh";
-            SERIAL = "/igloo/serial";
-          };
-        };
-      # archKey-keyed for dist assembly; *Packages (below) are the named outputs.
-      consoleBins = lib.mapAttrs (archKey: _: mkConsole archKey) archMatrix;
-      consolePackages = builtins.listToAttrs (
-        lib.mapAttrsToList
-          (archKey: _: {
-            name = "console-${archMatrix.${archKey}.penguinName}";
-            value = consoleBins.${archKey};
-          })
-          archMatrix
-      );
-
-      # --- Guest Rust utilities --------------------------------------------
-      # rust has no usable mips64 musl target (n64 muslabi64 is tier-3, no std),
-      # so -- like the upstream Docker builds, which copy the 32-bit mips binary
-      # to the mips64 slot -- the mips64 guests reuse the 32-bit mips Rust binary
-      # (MIPS is backwards compatible; o32 binaries run on 64-bit guests). C
-      # tools (console/busybox) still build natively for mips64.
-      rustBuildArch = archKey:
-        {
-          mips64eb = "mipseb";
-          mips64el = "mipsel";
-        }.${archKey} or archKey;
-
-      mkGuesthopper = archKey:
-        import ./src/mk-guest-rust-tool.nix {
-          crossPkgs = mkMuslCrossPkgs (rustBuildArch archKey);
-          src = guesthopper;
-          pname = "guesthopper";
-          version = "0.0.1";
-        };
-      guesthopperBins = lib.mapAttrs (archKey: _: mkGuesthopper archKey) archMatrix;
-      guesthopperPackages = builtins.listToAttrs (
-        lib.mapAttrsToList
-          (archKey: _: {
-            name = "guesthopper-${archMatrix.${archKey}.penguinName}";
-            value = guesthopperBins.${archKey};
-          })
-          archMatrix
-      );
-
-      # vpnguin: multi-call binary "vsock_vpn" (penguin renames it "vpn"). Guest
-      # runs `vpn guest` (all arches); host runs `vpn host` from the x86_64 build
-      # (its pcap deps are cfg(x86_64/aarch64)-gated, compiled in automatically).
-      mkVpnguin = archKey:
-        import ./src/mk-guest-rust-tool.nix {
-          crossPkgs = mkMuslCrossPkgs (rustBuildArch archKey);
-          src = vpnguin;
-          pname = "vsock_vpn";
-          version = "0.1.2";
-        };
-      vpnguinBins = lib.mapAttrs (archKey: _: mkVpnguin archKey) archMatrix;
-      vpnguinPackages = builtins.listToAttrs (
-        lib.mapAttrsToList
-          (archKey: _: {
-            name = "vpnguin-${archMatrix.${archKey}.penguinName}";
-            value = vpnguinBins.${archKey};
-          })
-          archMatrix
-      );
-
-      # --- busybox (forked, static-musl kconfig + libhc header) -------------
-      mkBusybox = archKey:
-        import ./src/mk-busybox.nix {
-          crossPkgs = mkMuslCrossPkgs archKey;
-          src = busybox;
-          inherit libhc;
-        };
-      busyboxBins = lib.mapAttrs (archKey: _: mkBusybox archKey) archMatrix;
-      busyboxPackages = builtins.listToAttrs (
-        lib.mapAttrsToList
-          (archKey: _: {
-            name = "busybox-${archMatrix.${archKey}.penguinName}";
-            value = busyboxBins.${archKey};
-          })
-          archMatrix
-      );
-
       mkDropinSysroot = archKey:
         import ./src/mk-dropin-sysroot.nix {
           inherit pkgs;
@@ -336,10 +212,7 @@
       dropinSysroots = lib.mapAttrs (archKey: _: mkDropinSysroot archKey) archMatrix;
 
       distRoot = import ./src/mk-dist-root.nix {
-        inherit pkgs archMatrix archClosures dropinSysroots
-          consoleBins guesthopperBins vpnguinBins busyboxBins;
-        guesthopperSrc = guesthopper;
-        libnvramSrc = libnvram;
+        inherit pkgs archMatrix archClosures dropinSysroots;
       };
 
       dist = import ./src/mk-dist-tarball.nix {
@@ -368,10 +241,6 @@
       packages.${system} =
         closurePackages
         // sysrootPackages
-        // consolePackages
-        // guesthopperPackages
-        // vpnguinPackages
-        // busyboxPackages
         // {
           "dist-root" = distRoot;
           dist = dist;
